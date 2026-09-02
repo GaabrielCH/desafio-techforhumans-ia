@@ -230,8 +230,10 @@ em texto, e o grafo necessariamente termina. Há um teste dedicado a isso.
 ### 5. Limite de taxa do free tier
 
 **Problema:** um turno do cliente pode custar três chamadas ao modelo (agente
-→ ferramenta → agente). O free tier da Gemini API permite 20 requisições por
-minuto, e uma conversa longa estourava a cota, entregando erro ao cliente.
+→ ferramenta → agente). O free tier da Gemini API limita as requisições por
+minuto **por modelo** — na medição feita durante o desenvolvimento, o
+`gemini-3.6-flash` cortava em 20 por minuto — e uma conversa longa estourava
+a cota, entregando erro ao cliente.
 
 **Solução:** retentativa com backoff que **lê o tempo sugerido pela própria
 API** (`"Please retry in 15.02s"`), com teto de 30s e jitter. Erros que não

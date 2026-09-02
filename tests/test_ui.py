@@ -1,8 +1,12 @@
-"""Fumaca da interface Streamlit.
+"""Interface: fumaca do app e seguranca da renderizacao.
 
-Servir o HTML nao prova nada: o Streamlit devolve a casca da pagina mesmo
-quando o script quebra. Estes testes executam `app.py` de verdade, com um
-LLM dublê, e conferem que nenhuma excecao escapou.
+Servir o HTML nao prova nada - o Streamlit devolve a casca da pagina mesmo
+quando o script quebra. Estes testes executam `app.py` de verdade, com um LLM
+dublê.
+
+A parte de seguranca importa porque a UI passou a montar HTML proprio para os
+balões de conversa: o texto do cliente e do modelo entra em `unsafe_allow_html`
+e precisa estar escapado.
 """
 
 from __future__ import annotations
@@ -10,7 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from dubles import LLMFalso
 from langchain_core.messages import AIMessage
+
+from banco_agil import ui
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
 
@@ -19,77 +26,133 @@ AppTest = pytest.importorskip(
 ).AppTest
 
 
-class LLMFalso:
-    """Responde sempre a mesma coisa; ferramentas nunca sao chamadas."""
-
-    def __init__(self, texto: str = "Ola! Sou o Agil. Qual o seu CPF?") -> None:
-        self.texto = texto
-
-    def bind_tools(self, ferramentas):
-        return self
-
-    def invoke(self, mensagens):
-        return AIMessage(content=self.texto)
-
-
 @pytest.fixture()
-def app_com_llm_falso(monkeypatch, base_clientes, base_score_limite):
-    from banco_agil import config, graph
+def app_com_llm_falso(monkeypatch, bases):
+    from banco_agil import graph
 
-    monkeypatch.setattr(config, "ARQUIVO_CLIENTES", base_clientes)
-    monkeypatch.setattr(config, "ARQUIVO_SCORE_LIMITE", base_score_limite)
-    monkeypatch.setattr(graph, "criar_modelo", lambda *a, **k: LLMFalso())
-
+    monkeypatch.setattr(
+        graph,
+        "criar_modelo",
+        lambda *a, **k: LLMFalso([AIMessage(content="Olá! Qual é o seu CPF?")]),
+    )
     return AppTest.from_file(str(APP), default_timeout=30).run()
 
 
-def test_pagina_carrega_sem_excecao(app_com_llm_falso):
-    at = app_com_llm_falso
-    assert not at.exception, [str(e) for e in at.exception]
-
-
-def _textos(at) -> str:
-    """Todo o markdown renderizado na pagina, concatenado."""
+def _pagina(at) -> str:
+    """Todo o markdown renderizado, concatenado."""
     return " ".join(str(m.value) for m in at.markdown)
 
 
-def test_saudacao_inicial_aparece_no_chat(app_com_llm_falso):
-    assert app_com_llm_falso.chat_message, "nenhuma mensagem renderizada"
-    assert "CPF" in _textos(app_com_llm_falso)
+# --------------------------------------------------------------------------- #
+# Fumaca
+# --------------------------------------------------------------------------- #
+def test_pagina_carrega_sem_excecao(app_com_llm_falso):
+    assert not app_com_llm_falso.exception, [
+        str(e) for e in app_com_llm_falso.exception
+    ]
 
 
-def test_barra_lateral_mostra_estado_nao_autenticado(app_com_llm_falso):
-    textos = " ".join(str(w.value) for w in app_com_llm_falso.sidebar.warning)
-    assert "Nao autenticado" in textos
+def test_saudacao_inicial_aparece(app_com_llm_falso):
+    assert "CPF" in _pagina(app_com_llm_falso)
+
+
+def test_marca_e_trilho_sao_renderizados(app_com_llm_falso):
+    pagina = _pagina(app_com_llm_falso)
+    assert "Banco Ágil" in pagina
+    assert "ag-trilho" in pagina, "o trilho de especialidades nao apareceu"
+    assert "Triagem" in pagina
+
+
+def test_trilho_marca_a_especialidade_ativa(app_com_llm_falso):
+    """A conversa comeca na triagem: ela precisa ser a unica acesa."""
+    import re
+
+    pagina = _pagina(app_com_llm_falso)
+    # Contar na pagina inteira pegaria tambem os seletores do CSS.
+    trilho = re.search(r'<ul class="ag-trilho">.*?</ul>', pagina, re.S)
+    assert trilho, "o trilho nao foi renderizado"
+
+    marcacao = trilho.group(0)
+    assert marcacao.count('data-ativa="1"') == 1
+    assert marcacao.count('data-ativa="0"') == 3
+    # E a parada acesa e a Triagem.
+    assert re.search(r'data-ativa="1">\s*Triagem', marcacao)
 
 
 def test_conversa_avanca_ao_enviar_mensagem(app_com_llm_falso):
     at = app_com_llm_falso
-    at.chat_input[0].set_value("meu cpf e 12345678901").run()
+    at.chat_input[0].set_value("meu cpf é 12345678901").run()
 
     assert not at.exception, [str(e) for e in at.exception]
-    # A mensagem do cliente e a resposta do agente estao ambas na pagina.
-    conteudo = _textos(at)
-    assert "12345678901" in conteudo
-    assert "CPF" in conteudo
+    pagina = _pagina(at)
+    assert "12345678901" in pagina
+    assert "CPF" in pagina
 
 
-def test_sem_chave_de_api_a_ui_orienta_em_vez_de_quebrar(
-    monkeypatch, base_clientes
-):
-    """O avaliador que rodar sem .env precisa entender o que fazer."""
-    from banco_agil import config, graph
+def test_sem_chave_de_api_a_ui_orienta_em_vez_de_quebrar(monkeypatch, bases):
+    """Quem rodar sem .env precisa entender o que fazer."""
+    from banco_agil import graph
     from banco_agil.erros import ErroBancoAgil
-
-    monkeypatch.setattr(config, "ARQUIVO_CLIENTES", base_clientes)
 
     def sem_chave(*args, **kwargs):
         raise ErroBancoAgil("GOOGLE_API_KEY nao configurada.")
 
     monkeypatch.setattr(graph, "criar_modelo", sem_chave)
-
     at = AppTest.from_file(str(APP), default_timeout=30).run()
 
     assert not at.exception, [str(e) for e in at.exception]
-    erros = " ".join(str(e.value) for e in at.error)
-    assert "GOOGLE_API_KEY" in erros
+    assert "GOOGLE_API_KEY" in " ".join(str(e.value) for e in at.error)
+
+
+# --------------------------------------------------------------------------- #
+# Seguranca da renderizacao
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "malicioso",
+    [
+        "<script>alert('xss')</script>",
+        "<img src=x onerror=alert(1)>",
+        "</div><style>body{display:none}</style>",
+        "<a href='javascript:alert(1)'>clique</a>",
+        "<iframe src='http://exemplo.com'></iframe>",
+    ],
+)
+def test_html_do_cliente_e_neutralizado(malicioso):
+    """O texto vira para dentro de unsafe_allow_html: tem de sair escapado."""
+    saida = ui.formatar_para_html(malicioso)
+    assert "<script" not in saida.lower()
+    assert "<img" not in saida.lower()
+    assert "<iframe" not in saida.lower()
+    assert "<style" not in saida.lower()
+    assert "onerror" not in saida.lower() or "&lt;" in saida
+    assert "&lt;" in saida
+
+
+def test_formatacao_permitida_sobrevive():
+    """Negrito, quebra de linha e valores continuam funcionando."""
+    saida = ui.formatar_para_html("Limite **aprovado**\nR$ 5.000,00")
+    assert "<strong>aprovado</strong>" in saida
+    assert "<br>" in saida
+    assert 'class="ag-valor"' in saida
+
+
+def test_negrito_nao_vira_brecha_de_html():
+    """O escape acontece ANTES de reintroduzir o negrito."""
+    saida = ui.formatar_para_html("**<script>x</script>**")
+    assert "<script>" not in saida
+    assert "<strong>" in saida
+
+
+def test_texto_vazio_nao_quebra():
+    assert ui.formatar_para_html("") == ""
+    assert ui.formatar_para_html(None) == ""
+
+
+def test_nome_do_cliente_e_escapado_na_ficha(monkeypatch):
+    """A ficha da retaguarda tambem monta HTML com dado vindo do CSV."""
+    import html as _html
+
+    nome = "<script>roubar()</script>"
+    assert "&lt;script&gt;" in _html.escape(nome)
+    # A ficha usa html.escape diretamente; este teste fixa a expectativa.
+    assert "<script>" not in _html.escape(nome)

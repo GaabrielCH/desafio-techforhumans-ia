@@ -1,0 +1,15 @@
+[theme]
+base = "light"
+primaryColor = "#0E9F6E"
+backgroundColor = "#EDF1EF"
+# Clara de proposito: o Streamlit usa esta cor tanto na barra lateral quanto
+# em widgets da area principal (o campo de mensagem, por exemplo). Escurecer
+# aqui deixaria o campo de texto ilegivel. A lateral e escurecida por CSS.
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0B1F1E"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

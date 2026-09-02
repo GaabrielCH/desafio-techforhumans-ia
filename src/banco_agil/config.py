@@ -13,6 +13,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def obter_segredo(nome: str, padrao: str = "") -> str:
+    """Le um segredo do ambiente ou dos secrets do Streamlit.
+
+    Local, a chave vem do ``.env``. No Streamlit Community Cloud nao existe
+    ``.env`` - os segredos sao cadastrados no painel e chegam por
+    ``st.secrets``. Procuramos nos dois, nessa ordem, para que o mesmo codigo
+    rode nos dois lugares sem ramificacao.
+    """
+    valor = os.getenv(nome, "").strip()
+    if valor:
+        return valor
+
+    try:  # pragma: no cover - so ocorre sob o runtime do Streamlit
+        import streamlit as st
+
+        return str(st.secrets.get(nome, padrao) or padrao).strip()
+    except Exception:  # noqa: BLE001 - sem streamlit ou sem secrets.toml
+        return padrao
+
 # --------------------------------------------------------------------------- #
 # Caminhos
 # --------------------------------------------------------------------------- #
@@ -27,13 +47,13 @@ ARQUIVO_SOLICITACOES = DIR_DADOS / "solicitacoes_aumento_limite.csv"
 # --------------------------------------------------------------------------- #
 # Modelo (LLM)
 # --------------------------------------------------------------------------- #
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-MODELO = os.getenv("BANCO_AGIL_MODELO", "gemini-3.1-flash-lite")
+GOOGLE_API_KEY = obter_segredo("GOOGLE_API_KEY")
+MODELO = obter_segredo("BANCO_AGIL_MODELO", "gemini-3.1-flash-lite")
 
 # Deixada em branco por padrao: os modelos Gemini 3.x usam amostragem fixa e
 # emitem aviso quando `temperature` e enviada. Preencha apenas se estiver
 # usando um modelo que aceite o parametro (ex.: gemini-2.5-flash).
-_temperatura_bruta = os.getenv("BANCO_AGIL_TEMPERATURA", "").strip()
+_temperatura_bruta = obter_segredo("BANCO_AGIL_TEMPERATURA")
 TEMPERATURA: float | None = (
     float(_temperatura_bruta) if _temperatura_bruta else None
 )
@@ -51,7 +71,7 @@ MAX_TENTATIVAS_AUTENTICACAO = 3
 # nascimento) para que o avaliador consiga se autenticar. E um painel que
 # expoe a base inteira: em qualquer uso que nao seja demonstracao, deve
 # ficar desligado.
-MODO_DEMO = os.getenv("BANCO_AGIL_MODO_DEMO", "true").strip().lower() in {
+MODO_DEMO = obter_segredo("BANCO_AGIL_MODO_DEMO", "true").lower() in {
     "1",
     "true",
     "sim",

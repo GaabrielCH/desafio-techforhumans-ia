@@ -327,7 +327,7 @@ específico e o agente refaz **apenas aquela pergunta**.
 | **AwesomeAPI para cotação** | Não exige chave de API — o avaliador roda o projeto sem cadastrar mais uma credencial — e devolve o par já convertido, sem precisar de LLM para interpretar resultado de busca. |
 | **CSV com escrita atômica + lock** | O desafio manda usar CSV. Escrita atômica evita corromper a base; o lock evita perda de atualização entre threads do Streamlit. |
 | **Exceções de domínio** | `ErroBaseDados`, `ErroServicoExterno`, `ErroEntradaInvalida` permitem que a camada de ferramentas traduza cada falha em uma mensagem adequada, em vez de um `except Exception` genérico. |
-| **Testes com LLM dublê** | 192 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Testes com LLM dublê** | 202 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
 
 ### O que ficou deliberadamente de fora
 
@@ -408,17 +408,53 @@ acontece por baixo:
 > (`BANCO_AGIL_MODO_DEMO=true`, padrão). Ele expõe a base inteira, então em
 > qualquer uso que não seja demonstração deve ficar desligado.
 
-### 4. Executar pelo terminal
+### 4. Publicar online (Streamlit Community Cloud)
+
+> **GitHub Pages não serve para este projeto.** Ele hospeda apenas arquivos
+> estáticos, e aqui há um servidor Python rodando agentes. O caminho é o
+> Streamlit Community Cloud, que é gratuito e faz deploy direto deste
+> repositório.
+
+1. Entre em [share.streamlit.io](https://share.streamlit.io) e autorize com
+   a conta do GitHub.
+2. **Create app** → **Deploy a public app from GitHub**, e preencha:
+   - Repository: `GaabrielCH/desafio-techforhumans-ia`
+   - Branch: `main`
+   - Main file path: `app.py`
+3. Antes de confirmar, abra **Advanced settings → Secrets** e cole:
+
+   ```toml
+   GOOGLE_API_KEY = "sua_chave_da_gemini_api"
+   BANCO_AGIL_MODELO = "gemini-3.1-flash-lite"
+   BANCO_AGIL_MODO_DEMO = "true"
+   ```
+
+4. **Deploy**. O tema em `.streamlit/config.toml` já sobe junto.
+
+O código não precisa de nenhuma alteração: `config.obter_segredo()` procura
+primeiro no ambiente (`.env`, local) e depois em `st.secrets` (nuvem).
+
+**Duas ressalvas do ambiente gratuito**, que valem para qualquer demo pública:
+
+- **O sistema de arquivos é efêmero e compartilhado.** Todos os visitantes
+  escrevem nos mesmos `clientes.csv` e `solicitacoes_aumento_limite.csv`, e
+  um redeploy zera as alterações. Para uma demonstração está correto; para
+  uso real, os CSVs dariam lugar a um banco de dados.
+- **A cota gratuita da Gemini é por minuto e compartilhada** entre todos os
+  visitantes simultâneos. Com várias pessoas testando ao mesmo tempo, o
+  backoff entra em ação e as respostas ficam mais lentas.
+
+### 5. Executar pelo terminal
 
 ```bash
 python main.py
 python main.py --debug    # mostra o agente ativo a cada turno
 ```
 
-### 5. Rodar os testes
+### 6. Rodar os testes
 
 ```bash
-pytest              # 192 testes, sem necessidade de chave de API
+pytest              # 202 testes, sem necessidade de chave de API
 pytest -v
 pytest --cov=src/banco_agil    # requer pytest-cov
 ```
@@ -534,7 +570,7 @@ desafio-techforhumans-ia/
 │   ├── tools/      # ferramentas por agente
 │   ├── services/   # regra de negócio
 │   └── repositories/  # acesso a CSV
-└── tests/          # 192 testes
+└── tests/          # 202 testes
 ```
 
 ---

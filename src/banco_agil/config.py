@@ -45,6 +45,20 @@ TEMPERATURA: float | None = (
 MAX_TENTATIVAS_AUTENTICACAO = 3
 
 # --------------------------------------------------------------------------- #
+# Modo demonstracao
+# --------------------------------------------------------------------------- #
+# Liga o painel lateral que lista os clientes de teste (CPF e data de
+# nascimento) para que o avaliador consiga se autenticar. E um painel que
+# expoe a base inteira: em qualquer uso que nao seja demonstracao, deve
+# ficar desligado.
+MODO_DEMO = os.getenv("BANCO_AGIL_MODO_DEMO", "true").strip().lower() in {
+    "1",
+    "true",
+    "sim",
+    "yes",
+}
+
+# --------------------------------------------------------------------------- #
 # Cambio
 # --------------------------------------------------------------------------- #
 API_CAMBIO = os.getenv(

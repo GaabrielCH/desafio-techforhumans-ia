@@ -13,6 +13,7 @@ from .. import config
 from ..erros import ErroBaseDados
 from ..logging_config import obter_logger
 from ..repositories import clientes as repo_clientes
+from ..utils import mascarar_cpf
 
 log = obter_logger("ferramenta.triagem")
 
@@ -74,7 +75,7 @@ def autenticar_cliente(
         )
 
     if cliente is not None:
-        log.info("Cliente autenticado: %s", cliente.cpf)
+        log.info("Cliente autenticado: %s", mascarar_cpf(cliente.cpf))
         return Command(
             update={
                 "autenticado": True,

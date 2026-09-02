@@ -3,9 +3,11 @@
     streamlit run app.py
 
 A UI e deliberadamente fina: ela nao conhece agentes nem ferramentas, so
-conversa com ``SessaoAtendimento``. O painel lateral existe para o avaliador
-enxergar o que o cliente nao ve (agente ativo, estado da sessao, arquivos
-gravados) sem quebrar a ilusao de atendente unico no chat.
+conversa com ``SessaoAtendimento``.
+
+O painel lateral existe para quem avalia: mostra o que o cliente NAO ve
+(especialidade ativa, estado da sessao, ferramentas acionadas no turno,
+arquivos gravados) sem quebrar a ilusao de atendente unico no chat.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from banco_agil.erros import ErroBancoAgil  # noqa: E402
 from banco_agil.graph import SessaoAtendimento  # noqa: E402
 from banco_agil.repositories import clientes as repo_clientes  # noqa: E402
 from banco_agil.repositories.csv_base import ler_csv  # noqa: E402
+from banco_agil.utils import formatar_data_br, formatar_moeda  # noqa: E402
 
 st.set_page_config(
     page_title="Banco Agil - Atendimento",
@@ -38,13 +41,26 @@ ROTULOS_AGENTE = {
     config.AGENTE_CAMBIO: "Cambio",
 }
 
+# Nomes tecnicos das ferramentas -> descricao legivel no painel.
+ROTULOS_FERRAMENTA = {
+    "autenticar_cliente": "🔐 Autenticou o cliente",
+    "consultar_limite_credito": "💳 Consultou limite e score",
+    "solicitar_aumento_limite": "📝 Registrou e analisou o pedido",
+    "realizar_entrevista_credito": "📊 Recalculou o score",
+    "consultar_cotacao_moeda": "💱 Consultou a cotacao",
+    "direcionar_para_credito": "➡️ Passou para Credito",
+    "direcionar_para_cambio": "➡️ Passou para Cambio",
+    "direcionar_para_entrevista": "➡️ Passou para Entrevista",
+    "encerrar_atendimento": "👋 Encerrou o atendimento",
+}
+
 
 # --------------------------------------------------------------------------- #
 # Sessao
 # --------------------------------------------------------------------------- #
 def reiniciar_sessao() -> None:
     """Descarta a conversa atual e comeca uma nova."""
-    for chave in ("sessao", "historico", "erro_inicializacao"):
+    for chave in ("sessao", "historico", "erro_inicializacao", "ferramentas"):
         st.session_state.pop(chave, None)
 
 
@@ -71,12 +87,91 @@ def garantir_sessao() -> SessaoAtendimento | None:
 
     st.session_state.sessao = sessao
     st.session_state.historico = [{"role": "assistant", "content": saudacao}]
+    st.session_state.ferramentas = []
     return sessao
 
 
 # --------------------------------------------------------------------------- #
-# Painel lateral
+# Painel lateral (visao de quem avalia)
 # --------------------------------------------------------------------------- #
+def _secao_estado(estado: dict) -> None:
+    st.subheader("Estado da sessao")
+
+    if estado.get("autenticado"):
+        st.success(f"Autenticado: {estado.get('nome')}")
+    else:
+        usadas = int(estado.get("tentativas_autenticacao", 0))
+        restantes = max(config.MAX_TENTATIVAS_AUTENTICACAO - usadas, 0)
+        st.warning("Nao autenticado")
+        st.caption(
+            f"Tentativas usadas: {usadas}/{config.MAX_TENTATIVAS_AUTENTICACAO} "
+            f"({restantes} restante(s))"
+        )
+
+    st.metric(
+        "Especialidade ativa",
+        ROTULOS_AGENTE.get(estado.get("agente_atual", ""), "-"),
+    )
+    st.caption("O cliente nao ve isto: no chat a troca e implicita.")
+
+    if estado.get("ultimo_status_solicitacao"):
+        st.info(f"Ultimo pedido: **{estado['ultimo_status_solicitacao']}**")
+
+    if estado.get("encerrado"):
+        st.error("Atendimento encerrado")
+
+
+def _secao_ferramentas() -> None:
+    """Mostra o que aconteceu por baixo no ultimo turno."""
+    ferramentas = st.session_state.get("ferramentas") or []
+    if not ferramentas:
+        return
+
+    st.subheader("No ultimo turno")
+    for nome in ferramentas:
+        st.markdown(f"- {ROTULOS_FERRAMENTA.get(nome, f'`{nome}`')}")
+
+
+def _secao_clientes_demo() -> None:
+    """Lista os clientes de teste. So existe em modo demonstracao."""
+    if not config.MODO_DEMO:
+        st.caption(
+            "Modo demonstracao desligado: a lista de clientes nao e exibida."
+        )
+        return
+
+    with st.expander("👤 Clientes para teste"):
+        st.caption("Dados ficticios, apenas para demonstracao.")
+        try:
+            for cliente in repo_clientes.listar_clientes():
+                st.markdown(
+                    f"**{cliente.nome}**  \n"
+                    f"CPF `{cliente.cpf}` · nasc. "
+                    f"`{formatar_data_br(cliente.data_nascimento)}`  \n"
+                    f"{formatar_moeda(cliente.limite_credito)} · "
+                    f"score **{cliente.score}**"
+                )
+        except ErroBancoAgil as exc:
+            st.error(str(exc))
+
+
+def _secao_solicitacoes() -> None:
+    with st.expander("📄 Solicitacoes registradas"):
+        if not config.ARQUIVO_SOLICITACOES.exists():
+            st.caption("Nenhuma solicitacao registrada ainda.")
+            return
+        try:
+            linhas = ler_csv(config.ARQUIVO_SOLICITACOES)
+        except ErroBancoAgil as exc:
+            st.error(str(exc))
+            return
+        if not linhas:
+            st.caption("Nenhuma solicitacao registrada ainda.")
+            return
+        st.dataframe(linhas[-15:], use_container_width=True, hide_index=True)
+        st.caption(f"{len(linhas)} pedido(s) no total.")
+
+
 def desenhar_barra_lateral(sessao: SessaoAtendimento | None) -> None:
     with st.sidebar:
         st.header("🏦 Banco Agil")
@@ -87,56 +182,11 @@ def desenhar_barra_lateral(sessao: SessaoAtendimento | None) -> None:
             st.rerun()
 
         st.divider()
-        st.subheader("Estado da sessao")
-
-        estado = sessao.estado if sessao else {}
-        if estado.get("autenticado"):
-            st.success(f"Autenticado: {estado.get('nome')}")
-            st.caption(f"CPF {estado.get('cpf')}")
-        else:
-            usadas = int(estado.get("tentativas_autenticacao", 0))
-            st.warning("Nao autenticado")
-            st.caption(
-                f"Tentativas: {usadas}/{config.MAX_TENTATIVAS_AUTENTICACAO}"
-            )
-
-        st.metric(
-            "Especialidade ativa",
-            ROTULOS_AGENTE.get(estado.get("agente_atual", ""), "-"),
-        )
-        st.caption(
-            "O cliente nao ve esta informacao: no chat a troca e implicita."
-        )
-
-        if estado.get("ultimo_status_solicitacao"):
-            st.info(f"Ultimo pedido: **{estado['ultimo_status_solicitacao']}**")
-
-        if estado.get("encerrado"):
-            st.error("Atendimento encerrado")
-
+        _secao_estado(sessao.estado if sessao else {})
+        _secao_ferramentas()
         st.divider()
-        with st.expander("👤 Clientes para teste"):
-            try:
-                for cliente in repo_clientes.listar_clientes():
-                    st.markdown(
-                        f"**{cliente.nome}**  \n"
-                        f"CPF `{cliente.cpf}` · nasc. "
-                        f"`{cliente.data_nascimento}`  \n"
-                        f"Limite R$ {cliente.limite_credito:,.2f} · "
-                        f"score **{cliente.score}**"
-                    )
-            except ErroBancoAgil as exc:
-                st.error(str(exc))
-
-        with st.expander("📄 Solicitacoes registradas"):
-            if config.ARQUIVO_SOLICITACOES.exists():
-                try:
-                    linhas = ler_csv(config.ARQUIVO_SOLICITACOES)
-                    st.dataframe(linhas, use_container_width=True, hide_index=True)
-                except ErroBancoAgil as exc:
-                    st.error(str(exc))
-            else:
-                st.caption("Nenhuma solicitacao registrada ainda.")
+        _secao_clientes_demo()
+        _secao_solicitacoes()
 
 
 # --------------------------------------------------------------------------- #
@@ -185,4 +235,5 @@ if entrada:
         st.markdown(resposta)
 
     st.session_state.historico.append({"role": "assistant", "content": resposta})
+    st.session_state.ferramentas = sessao.ferramentas_do_ultimo_turno()
     st.rerun()

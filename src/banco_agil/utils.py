@@ -119,6 +119,27 @@ def normalizar_valor_monetario(valor: str | float | int) -> float:
     return numero
 
 
+_NUMEROS_POR_EXTENSO = {
+    "zero": 0,
+    "nenhum": 0,
+    "nenhuma": 0,
+    "um": 1,
+    "uma": 1,
+    "dois": 2,
+    "duas": 2,
+    "tres": 3,
+    "quatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "sete": 7,
+    "oito": 8,
+    "nove": 9,
+    "dez": 10,
+    "onze": 11,
+    "doze": 12,
+}
+
+
 def normalizar_inteiro_nao_negativo(valor: str | int) -> int:
     """Converte texto em inteiro >= 0 (usado para numero de dependentes)."""
     if isinstance(valor, bool):
@@ -126,19 +147,43 @@ def normalizar_inteiro_nao_negativo(valor: str | int) -> int:
     if isinstance(valor, int):
         numero = valor
     else:
-        digitos = re.sub(r"\D", "", str(valor))
-        if not digitos:
-            # "nenhum", "sem dependentes" -> 0
-            if any(p in normalizar_texto(valor) for p in ("nenhum", "sem", "nao")):
+        texto = normalizar_texto(valor)
+        digitos = re.sub(r"\D", "", texto)
+
+        if digitos:
+            numero = int(digitos)
+        else:
+            # "dois filhos", "nenhum dependente": numero por extenso.
+            palavras = re.findall(r"[a-z]+", texto)
+            encontrado = next(
+                (_NUMEROS_POR_EXTENSO[p] for p in palavras
+                 if p in _NUMEROS_POR_EXTENSO),
+                None,
+            )
+            if encontrado is not None:
+                return encontrado
+            if any(p in texto for p in ("sem", "nao")):
                 return 0
             raise ErroEntradaInvalida(
                 f"Nao foi possivel interpretar o numero '{valor}'."
             )
-        numero = int(digitos)
 
     if numero < 0:
         raise ErroEntradaInvalida("O numero nao pode ser negativo.")
     return numero
+
+
+def mascarar_cpf(cpf: str) -> str:
+    """Mascara um CPF para registro em log.
+
+    Log de aplicacao nao e lugar de dado pessoal completo: quem investiga um
+    incidente precisa correlacionar eventos, nao identificar a pessoa.
+    '12345678901' -> '123.***.***-01'.
+    """
+    digitos = re.sub(r"\D", "", str(cpf or ""))
+    if len(digitos) != 11:
+        return "***"
+    return f"{digitos[:3]}.***.***-{digitos[-2:]}"
 
 
 def normalizar_sim_nao(valor: str | bool) -> str:

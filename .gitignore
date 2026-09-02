@@ -15,6 +15,7 @@ htmlcov/
 # Logs e artefatos de execucao
 logs/
 data/solicitacoes_aumento_limite.csv
+*.lock
 
 # Editores / SO
 .vscode/

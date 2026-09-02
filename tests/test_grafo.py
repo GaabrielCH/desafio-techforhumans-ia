@@ -13,61 +13,11 @@ Por isso os testes rodam sem chave de API e sem rede.
 
 from __future__ import annotations
 
-import pytest
+from dubles import LLMFalso, chamada
 from langchain_core.messages import AIMessage
 
 from banco_agil import config
 from banco_agil.graph import SessaoAtendimento, construir_grafo
-
-
-class LLMFalso:
-    """Dublê de chat model: devolve mensagens roteirizadas, em ordem.
-
-    Implementa apenas ``bind_tools`` e ``invoke``, que e tudo que o no do
-    agente consome.
-    """
-
-    def __init__(self, roteiro: list[AIMessage]) -> None:
-        self.roteiro = list(roteiro)
-        self.chamadas: list[list] = []
-
-    def bind_tools(self, ferramentas):  # noqa: D102 - interface do LangChain
-        self.ultimas_ferramentas = [f.name for f in ferramentas]
-        return self
-
-    def invoke(self, mensagens):  # noqa: D102
-        self.chamadas.append(mensagens)
-        if not self.roteiro:
-            return AIMessage(content="Posso ajudar em algo mais?")
-        return self.roteiro.pop(0)
-
-
-def chamada(nome: str, args: dict | None = None, ident: str = "call_1") -> AIMessage:
-    """Monta uma AIMessage que solicita uma ferramenta."""
-    return AIMessage(
-        content="",
-        tool_calls=[
-            {
-                "name": nome,
-                "args": args or {},
-                "id": ident,
-                "type": "tool_call",
-            }
-        ],
-    )
-
-
-@pytest.fixture()
-def bases(monkeypatch, base_clientes, base_score_limite, base_solicitacoes):
-    """Aponta a configuracao global para as bases temporarias do teste."""
-    monkeypatch.setattr(config, "ARQUIVO_CLIENTES", base_clientes)
-    monkeypatch.setattr(config, "ARQUIVO_SCORE_LIMITE", base_score_limite)
-    monkeypatch.setattr(config, "ARQUIVO_SOLICITACOES", base_solicitacoes)
-    return {
-        "clientes": base_clientes,
-        "score_limite": base_score_limite,
-        "solicitacoes": base_solicitacoes,
-    }
 
 
 def montar_sessao(roteiro: list[AIMessage]) -> SessaoAtendimento:

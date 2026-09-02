@@ -29,3 +29,6 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "slow: testes que sobem subprocessos ou dependem de tempo real",
+]

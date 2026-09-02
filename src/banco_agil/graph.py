@@ -344,6 +344,29 @@ class SessaoAtendimento:
                     return conteudo
         return _MENSAGEM_FALHA_MODELO
 
+    def ferramentas_do_ultimo_turno(self) -> list[str]:
+        """Ferramentas acionadas desde a ultima fala do cliente.
+
+        Existe para a UI de avaliacao: permite ver o handoff acontecendo no
+        painel lateral enquanto o chat continua costurado, sem nenhuma pista
+        da transicao. E leitura do estado, nao instrumentacao do fluxo.
+        """
+        mensagens = self.estado.get("messages", [])
+
+        inicio = 0
+        for indice in range(len(mensagens) - 1, -1, -1):
+            if isinstance(mensagens[indice], HumanMessage):
+                inicio = indice
+                break
+
+        nomes: list[str] = []
+        for mensagem in mensagens[inicio:]:
+            for chamada in getattr(mensagem, "tool_calls", None) or []:
+                nome = chamada.get("name") if isinstance(chamada, dict) else None
+                if nome:
+                    nomes.append(nome)
+        return nomes
+
     @property
     def estado(self) -> dict[str, Any]:
         """Estado atual persistido no checkpointer."""

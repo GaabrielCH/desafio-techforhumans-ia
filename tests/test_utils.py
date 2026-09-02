@@ -86,11 +86,26 @@ def test_normalizar_inteiro_nao_negativo(entrada, esperado):
     assert normalizar_inteiro_nao_negativo(entrada) == esperado
 
 
-def test_normalizar_inteiro_rejeita_numero_por_extenso():
-    # Numeros por extenso ficam a cargo do LLM, que ja converte antes de
-    # chamar a ferramenta. Aqui a falha precisa ser explicita.
+@pytest.mark.parametrize(
+    ("entrada", "esperado"),
+    [
+        ("dois", 2),
+        ("duas filhas", 2),
+        ("tres", 3),
+        ("um dependente", 1),
+        ("zero", 0),
+        ("nenhuma", 0),
+    ],
+)
+def test_normalizar_inteiro_aceita_numero_por_extenso(entrada, esperado):
+    # O cliente responde "dois filhos" com naturalidade; exigir digito
+    # obrigaria o agente a refazer a pergunta sem necessidade.
+    assert normalizar_inteiro_nao_negativo(entrada) == esperado
+
+
+def test_normalizar_inteiro_ainda_rejeita_o_ininteligivel():
     with pytest.raises(ErroEntradaInvalida):
-        normalizar_inteiro_nao_negativo("dois")
+        normalizar_inteiro_nao_negativo("depende do mes")
 
 
 @pytest.mark.parametrize(

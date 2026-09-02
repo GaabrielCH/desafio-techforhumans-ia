@@ -8,8 +8,8 @@ from pathlib import Path
 from .. import config
 from ..erros import ClienteNaoEncontrado, ErroBaseDados
 from ..logging_config import obter_logger
-from ..utils import normalizar_cpf, normalizar_data
-from .csv_base import escrever_csv, exigir_colunas, ler_csv, obter_lock
+from ..utils import mascarar_cpf, normalizar_cpf, normalizar_data
+from .csv_base import escrever_csv, exigir_colunas, ler_csv, trava_arquivo
 
 log = obter_logger("repositorio.clientes")
 
@@ -34,14 +34,17 @@ def _converter(linha: dict[str, str]) -> Cliente:
     except ValueError:
         log.warning(
             "limite_credito invalido para o CPF %s; assumindo 0.0",
-            linha.get("cpf"),
+            mascarar_cpf(linha.get("cpf", "")),
         )
         limite = 0.0
 
     try:
         score = int(float(str(linha.get("score", "0")).replace(",", ".")))
     except ValueError:
-        log.warning("score invalido para o CPF %s; assumindo 0", linha.get("cpf"))
+        log.warning(
+            "score invalido para o CPF %s; assumindo 0",
+            mascarar_cpf(linha.get("cpf", "")),
+        )
         score = 0
 
     return Cliente(
@@ -90,7 +93,7 @@ def _atualizar_campo(
     caminho = caminho or config.ARQUIVO_CLIENTES
     alvo = normalizar_cpf(cpf)
 
-    with obter_lock(caminho):
+    with trava_arquivo(caminho):
         linhas = ler_csv(caminho)
         exigir_colunas(linhas, COLUNAS, caminho.name)
 
@@ -120,7 +123,11 @@ def atualizar_score(cpf: str, novo_score: int, caminho: Path | None = None) -> C
         config.SCORE_MINIMO, min(config.SCORE_MAXIMO, int(novo_score))
     )
     cliente = _atualizar_campo(cpf, "score", str(score_limitado), caminho)
-    log.info("Score do CPF %s atualizado para %d.", cliente.cpf, score_limitado)
+    log.info(
+        "Score do CPF %s atualizado para %d.",
+        mascarar_cpf(cliente.cpf),
+        score_limitado,
+    )
     return cliente
 
 
@@ -130,7 +137,9 @@ def atualizar_limite(
     """Persiste o novo limite de credito aprovado."""
     cliente = _atualizar_campo(cpf, "limite_credito", f"{float(novo_limite):.2f}", caminho)
     log.info(
-        "Limite do CPF %s atualizado para %.2f.", cliente.cpf, float(novo_limite)
+        "Limite do CPF %s atualizado para %.2f.",
+        mascarar_cpf(cliente.cpf),
+        float(novo_limite),
     )
     return cliente
 
@@ -160,8 +169,14 @@ def autenticar(
         raise
 
     if cliente.data_nascimento == data_normalizada:
-        log.info("Autenticacao bem-sucedida para o CPF %s.", cpf_normalizado)
+        log.info(
+            "Autenticacao bem-sucedida para o CPF %s.",
+            mascarar_cpf(cpf_normalizado),
+        )
         return cliente
 
-    log.info("Data de nascimento divergente para o CPF %s.", cpf_normalizado)
+    log.info(
+        "Data de nascimento divergente para o CPF %s.",
+        mascarar_cpf(cpf_normalizado),
+    )
     return None

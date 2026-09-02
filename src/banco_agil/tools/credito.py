@@ -13,7 +13,7 @@ from ..erros import ClienteNaoEncontrado, ErroBaseDados, ErroEntradaInvalida
 from ..logging_config import obter_logger
 from ..repositories import score_limite as repo_score_limite
 from ..services import credito as servico_credito
-from ..utils import formatar_moeda, normalizar_valor_monetario
+from ..utils import formatar_moeda, mascarar_cpf, normalizar_valor_monetario
 
 log = obter_logger("ferramenta.credito")
 
@@ -38,7 +38,10 @@ def consultar_limite_credito(
         cliente = servico_credito.consultar_limite(state["cpf"])
         teto = repo_score_limite.limite_maximo_para_score(cliente.score)
     except ClienteNaoEncontrado:
-        log.error("CPF autenticado %s sumiu da base.", state.get("cpf"))
+        log.error(
+            "CPF autenticado %s sumiu da base.",
+            mascarar_cpf(state.get("cpf", "")),
+        )
         return (
             "Erro: o cadastro do cliente nao foi localizado. Peca desculpas e "
             "oriente a procurar uma agencia."
@@ -107,7 +110,10 @@ def solicitar_aumento_limite(
             "pergunte qual valor ele deseja."
         )
     except ClienteNaoEncontrado:
-        log.error("CPF autenticado %s sumiu da base.", state.get("cpf"))
+        log.error(
+            "CPF autenticado %s sumiu da base.",
+            mascarar_cpf(state.get("cpf", "")),
+        )
         return _erro(
             "Erro: cadastro do cliente nao localizado. Peca desculpas e "
             "oriente a procurar uma agencia."

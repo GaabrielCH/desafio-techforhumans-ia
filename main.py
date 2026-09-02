@@ -14,6 +14,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
+# O console do Windows ainda abre em codepage legada, e a conversa e em
+# portugues: sem isto, todo acento vira '?' no terminal.
+for _fluxo in (sys.stdout, sys.stderr):
+    try:
+        _fluxo.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):  # pragma: no cover - depende do console
+        pass
+
 from banco_agil.erros import ErroBancoAgil  # noqa: E402
 from banco_agil.graph import SessaoAtendimento  # noqa: E402
 

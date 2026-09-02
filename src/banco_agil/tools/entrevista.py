@@ -20,7 +20,7 @@ from ..logging_config import obter_logger
 from ..repositories import clientes as repo_clientes
 from ..repositories import score_limite as repo_score_limite
 from ..services import score as servico_score
-from ..utils import formatar_moeda
+from ..utils import formatar_moeda, mascarar_cpf
 
 log = obter_logger("ferramenta.entrevista")
 
@@ -89,7 +89,10 @@ def realizar_entrevista_credito(
         cliente = repo_clientes.atualizar_score(state["cpf"], resultado.score)
         teto = repo_score_limite.limite_maximo_para_score(cliente.score)
     except ClienteNaoEncontrado:
-        log.error("CPF autenticado %s sumiu da base.", state.get("cpf"))
+        log.error(
+            "CPF autenticado %s sumiu da base.",
+            mascarar_cpf(state.get("cpf", "")),
+        )
         return _erro(
             "Erro: cadastro do cliente nao localizado. Peca desculpas e oriente "
             "a procurar uma agencia."
@@ -104,7 +107,7 @@ def realizar_entrevista_credito(
 
     log.info(
         "Score do CPF %s atualizado para %d (bruto %.2f).",
-        cliente.cpf,
+        mascarar_cpf(cliente.cpf),
         cliente.score,
         resultado.score_bruto,
     )
@@ -115,8 +118,7 @@ def realizar_entrevista_credito(
             "messages": [
                 ToolMessage(
                     content=(
-                        f"Entrevista concluida. Novo score: {cliente.score} "
-                        f"(anteriormente informado ao cliente pode ter mudado). "
+                        f"Entrevista concluida. Novo score: {cliente.score}. "
                         f"Base de clientes atualizada. Com esse score o teto "
                         f"autorizado passa a ser {formatar_moeda(teto)}. "
                         f"Limite atual do cliente: "

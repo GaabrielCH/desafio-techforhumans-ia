@@ -58,6 +58,27 @@ def test_moeda_desconhecida_gera_erro_de_entrada(entrada):
         servico.resolver_codigo_moeda(entrada)
 
 
+@pytest.mark.parametrize(
+    ("frase", "codigo"),
+    [
+        ("quero a cotacao do dolar canadense hoje", "CAD"),
+        ("me da o dolar australiano por favor", "AUD"),
+        ("qual o valor da libra esterlina agora", "GBP"),
+        ("cotacao do dolar americano", "USD"),
+        ("quanto esta o dolar?", "USD"),
+        ("me diz o peso argentino", "ARS"),
+    ],
+)
+def test_apelido_mais_longo_vence_dentro_da_frase(frase, codigo):
+    """Regressao: 'dolar' casava antes de 'dolar canadense'.
+
+    O casamento por substring percorria o dicionario na ordem de definicao,
+    entao uma frase com 'dolar canadense' resolvia para USD e o cliente
+    receberia a cotacao da moeda errada - um erro silencioso e caro.
+    """
+    assert servico.resolver_codigo_moeda(frase) == codigo
+
+
 def test_cotacao_bem_sucedida(monkeypatch):
     chamadas = []
 

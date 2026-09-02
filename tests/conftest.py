@@ -50,3 +50,25 @@ def base_score_limite(tmp_path: Path) -> Path:
 def base_solicitacoes(tmp_path: Path) -> Path:
     """Caminho de saida; o arquivo e criado pelo proprio repositorio."""
     return tmp_path / "solicitacoes_aumento_limite.csv"
+
+
+@pytest.fixture()
+def bases(
+    monkeypatch, base_clientes: Path, base_score_limite: Path,
+    base_solicitacoes: Path,
+) -> dict[str, Path]:
+    """Aponta a configuracao global para as bases temporarias do teste.
+
+    Necessario para os testes que exercitam o grafo inteiro, porque as
+    ferramentas leem os caminhos de ``config`` em tempo de chamada.
+    """
+    from banco_agil import config
+
+    monkeypatch.setattr(config, "ARQUIVO_CLIENTES", base_clientes)
+    monkeypatch.setattr(config, "ARQUIVO_SCORE_LIMITE", base_score_limite)
+    monkeypatch.setattr(config, "ARQUIVO_SOLICITACOES", base_solicitacoes)
+    return {
+        "clientes": base_clientes,
+        "score_limite": base_score_limite,
+        "solicitacoes": base_solicitacoes,
+    }

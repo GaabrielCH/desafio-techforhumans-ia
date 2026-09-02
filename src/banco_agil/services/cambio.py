@@ -56,6 +56,10 @@ APELIDOS_MOEDA: dict[str, str] = {
     "r$": "BRL",
 }
 
+# Apelidos ordenados do mais longo para o mais curto, para o casamento por
+# substring nunca preferir um apelido que seja prefixo de outro.
+_APELIDOS_POR_TAMANHO = sorted(APELIDOS_MOEDA, key=len, reverse=True)
+
 NOMES_MOEDA: dict[str, str] = {
     "USD": "dolar americano",
     "EUR": "euro",
@@ -103,10 +107,13 @@ def resolver_codigo_moeda(moeda: str) -> str:
     if texto in APELIDOS_MOEDA:
         return APELIDOS_MOEDA[texto]
 
-    # Tenta casar por prefixo ("dolar canadense hoje").
-    for apelido, codigo in APELIDOS_MOEDA.items():
+    # Casamento por substring dentro de uma frase ("cotacao do dolar
+    # canadense hoje"). Do apelido mais longo para o mais curto: na ordem do
+    # dicionario, "dolar" casaria antes de "dolar canadense" e o cliente
+    # receberia a cotacao da moeda errada.
+    for apelido in _APELIDOS_POR_TAMANHO:
         if apelido in texto:
-            return codigo
+            return APELIDOS_MOEDA[apelido]
 
     candidato = texto.upper().strip()
     if len(candidato) == 3 and candidato.isalpha():

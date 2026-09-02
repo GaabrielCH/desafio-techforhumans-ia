@@ -113,8 +113,25 @@ que a fórmula de score e a política de crédito são testáveis sem chave de A
 **Escrita atômica:** a base de clientes é reescrita inteira quando o score
 muda. Gravar direto no arquivo final significaria perder tudo se o processo
 morresse no meio, então a gravação vai para um arquivo temporário e usa
-`os.replace`, que é atômico no mesmo volume. Um `RLock` por arquivo cobre
-leitura + escrita, já que o Streamlit atende cada sessão em uma thread.
+`os.replace`, que é atômico no mesmo volume.
+
+**Concorrência em dois níveis.** Um `RLock` por arquivo protege as threads do
+mesmo processo (o Streamlit atende cada sessão em uma). Isso não basta: um
+lock de processo não atravessa a fronteira do SO, e duas instâncias do app —
+ou o app e a CLI — se atropelariam. Por isso há também um **lock de arquivo do
+próprio sistema operacional** (`msvcrt` no Windows, `fcntl` no POSIX) sobre um
+arquivo sentinela `.lock`. A trava é reentrante, o que permite a
+`analisar_aumento` gravar o pedido e concluir o status como uma operação só.
+
+> Medição real: 3 processos gravando 40 pedidos cada. **Sem** o lock de
+> arquivo, 2 das 120 linhas somem — silenciosamente, sem exceção nenhuma.
+> **Com** o lock, as 120 sobrevivem. O teste que cobre isso está em
+> `tests/test_concorrencia.py`.
+
+**Injeção de fórmula em CSV:** uma célula iniciada por `=`, `+`, `-` ou `@`
+vira fórmula ao abrir o arquivo no Excel. Como esses CSVs são a saída oficial
+do sistema e podem ser abertos por um analista, toda célula gravada passa por
+uma sanitização que prefixa esses casos com apóstrofo.
 
 #### Ciclo de vida de uma solicitação de aumento
 
@@ -170,6 +187,17 @@ falhe, fica o rastro de que o cliente pediu.
       inválida, limite de taxa do LLM — todos viram mensagem clara e a
       conversa continua
 - [x] Log técnico em `logs/banco_agil.log` para análise posterior
+
+### Segurança
+- [x] Autenticação verificada **no estado**, não no prompt — resistente a
+      injeção de prompt (12 testes cobrem tentativas de burla)
+- [x] CPF mascarado nos logs (`123.***.***-01`)
+- [x] Falha de autenticação não revela se o errado foi o CPF ou a data,
+      o que impediria enumerar quais CPFs existem
+- [x] Sanitização contra injeção de fórmula nos CSVs gravados
+- [x] Lista de clientes de teste no painel só aparece em modo demonstração
+      (`BANCO_AGIL_MODO_DEMO`)
+- [x] Segredos fora do versionamento (`.env` no `.gitignore`)
 
 ---
 
@@ -250,7 +278,32 @@ conversa se contradiria.
 **Solução:** aprovar passou a **efetivar o limite** na base. O desafio não
 pede isso explicitamente, mas sem isso o sistema mente para o cliente.
 
-### 7. Entrada humana não é um formulário
+### 7. A trava de arquivo trocava de identidade
+
+**Problema:** a chave que identificava a trava de um arquivo era o caminho
+resolvido **só quando o arquivo já existia**. O CSV de solicitações nasce na
+primeira gravação — ou seja, exatamente no momento em que a chave mudava.
+Caminho relativo e absoluto também geravam travas distintas.
+
+**Impacto:** duas rotinas podiam segurar travas *diferentes* para o mesmo
+arquivo. A exclusão mútua deixava de valer sem nenhum sintoma: nada falha,
+apenas se perdem escritas.
+
+**Solução:** `resolve()` sempre, inclusive para caminhos inexistentes. Há
+testes que fixam a chave antes e depois de o arquivo nascer, e que comparam
+caminho relativo com absoluto.
+
+### 8. `"cotação do dólar canadense"` devolvia dólar americano
+
+**Problema:** quando a moeda vinha dentro de uma frase, o casamento por
+substring percorria o dicionário de apelidos na ordem de definição. `"dolar"`
+aparece antes de `"dolar canadense"`, então batia primeiro e o cliente
+receberia a cotação da moeda errada — um erro silencioso e caro.
+
+**Solução:** ordenar os apelidos do mais longo para o mais curto antes de
+casar. Seis casos de frase cobrem a regressão.
+
+### 9. Entrada humana não é um formulário
 
 **Problema:** o cliente escreve "R$ 5.000,00", "14/05/1990", "carteira
 assinada", "não tenho nenhum".
@@ -274,7 +327,7 @@ específico e o agente refaz **apenas aquela pergunta**.
 | **AwesomeAPI para cotação** | Não exige chave de API — o avaliador roda o projeto sem cadastrar mais uma credencial — e devolve o par já convertido, sem precisar de LLM para interpretar resultado de busca. |
 | **CSV com escrita atômica + lock** | O desafio manda usar CSV. Escrita atômica evita corromper a base; o lock evita perda de atualização entre threads do Streamlit. |
 | **Exceções de domínio** | `ErroBaseDados`, `ErroServicoExterno`, `ErroEntradaInvalida` permitem que a camada de ferramentas traduza cada falha em uma mensagem adequada, em vez de um `except Exception` genérico. |
-| **Testes com LLM dublê** | 148 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Testes com LLM dublê** | 192 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
 
 ### O que ficou deliberadamente de fora
 
@@ -336,9 +389,24 @@ BANCO_AGIL_MODELO=gemini-3.1-flash-lite
 streamlit run app.py
 ```
 
-Acesse `http://localhost:8501`. O painel lateral mostra o estado da sessão
-(agente ativo, autenticação, solicitações gravadas) — informação que o
-cliente não vê no chat.
+Acesse `http://localhost:8501`.
+
+O chat é o que o cliente veria: um atendente só, sem nenhuma pista de
+transição. O **painel lateral é a visão de quem avalia** e mostra o que
+acontece por baixo:
+
+- **Especialidade ativa** — muda de "Triagem" para "Crédito" ou "Câmbio"
+  enquanto a conversa segue costurada
+- **Estado da sessão** — autenticação e tentativas usadas (x/3)
+- **No último turno** — as ferramentas que foram acionadas, incluindo os
+  handoffs (`➡️ Passou para Crédito`). É aqui que dá para *ver* a
+  arquitetura funcionando
+- **Clientes para teste** — CPFs e datas para conseguir se autenticar
+- **Solicitações registradas** — o CSV ao vivo, a cada pedido
+
+> O painel de clientes existe só em modo demonstração
+> (`BANCO_AGIL_MODO_DEMO=true`, padrão). Ele expõe a base inteira, então em
+> qualquer uso que não seja demonstração deve ficar desligado.
 
 ### 4. Executar pelo terminal
 
@@ -350,7 +418,7 @@ python main.py --debug    # mostra o agente ativo a cada turno
 ### 5. Rodar os testes
 
 ```bash
-pytest              # 148 testes, sem necessidade de chave de API
+pytest              # 192 testes, sem necessidade de chave de API
 pytest -v
 pytest --cov=src/banco_agil    # requer pytest-cov
 ```
@@ -466,7 +534,7 @@ desafio-techforhumans-ia/
 │   ├── tools/      # ferramentas por agente
 │   ├── services/   # regra de negócio
 │   └── repositories/  # acesso a CSV
-└── tests/          # 148 testes
+└── tests/          # 192 testes
 ```
 
 ---

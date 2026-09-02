@@ -22,6 +22,8 @@ from ..repositories import clientes as repo_clientes
 from ..repositories import score_limite as repo_score_limite
 from ..repositories import solicitacoes as repo_solicitacoes
 from ..repositories.clientes import Cliente
+from ..repositories.csv_base import trava_arquivo
+from ..utils import mascarar_cpf
 
 log = obter_logger("servico.credito")
 
@@ -79,29 +81,35 @@ def analisar_aumento(
             f"o limite atual (R$ {cliente.limite_credito:.2f})."
         )
 
-    # 1. Pedido formal fica gravado antes de qualquer decisao.
-    solicitacao = repo_solicitacoes.registrar(
-        cpf=cliente.cpf,
-        limite_atual=cliente.limite_credito,
-        novo_limite=novo_limite,
-        status=config.STATUS_PENDENTE,
-        caminho=caminho_solicitacoes,
-    )
+    arquivo_solicitacoes = caminho_solicitacoes or config.ARQUIVO_SOLICITACOES
 
-    # 2. Politica de credito conforme o score atual.
-    teto = repo_score_limite.limite_maximo_para_score(
-        cliente.score, caminho_score_limite
-    )
-    aprovado = novo_limite <= teto
-    status = config.STATUS_APROVADO if aprovado else config.STATUS_REJEITADO
+    # A trava cobre registrar + concluir como uma operacao so. Sem ela, outro
+    # processo poderia gravar entre as duas etapas e o pedido ficaria
+    # 'pendente' para sempre, ou pior, o desfecho cairia na linha errada.
+    with trava_arquivo(arquivo_solicitacoes):
+        # 1. Pedido formal fica gravado antes de qualquer decisao.
+        solicitacao = repo_solicitacoes.registrar(
+            cpf=cliente.cpf,
+            limite_atual=cliente.limite_credito,
+            novo_limite=novo_limite,
+            status=config.STATUS_PENDENTE,
+            caminho=caminho_solicitacoes,
+        )
 
-    # 3. Desfecho registrado na mesma linha.
-    repo_solicitacoes.atualizar_status(
-        cpf=cliente.cpf,
-        data_hora=solicitacao.data_hora_solicitacao,
-        novo_status=status,
-        caminho=caminho_solicitacoes,
-    )
+        # 2. Politica de credito conforme o score atual.
+        teto = repo_score_limite.limite_maximo_para_score(
+            cliente.score, caminho_score_limite
+        )
+        aprovado = novo_limite <= teto
+        status = config.STATUS_APROVADO if aprovado else config.STATUS_REJEITADO
+
+        # 3. Desfecho registrado na mesma linha.
+        repo_solicitacoes.atualizar_status(
+            cpf=cliente.cpf,
+            data_hora=solicitacao.data_hora_solicitacao,
+            novo_status=status,
+            caminho=caminho_solicitacoes,
+        )
 
     if aprovado:
         # O desafio nao pede explicitamente, mas sem isto o agente diria
@@ -116,12 +124,12 @@ def analisar_aumento(
             log.exception(
                 "Aumento aprovado para o CPF %s, mas o limite nao pode ser "
                 "efetivado na base.",
-                cliente.cpf,
+                mascarar_cpf(cliente.cpf),
             )
 
         log.info(
             "Aumento aprovado para o CPF %s: %.2f -> %.2f (score %d, teto %.2f).",
-            cliente.cpf,
+            mascarar_cpf(cliente.cpf),
             cliente.limite_credito,
             novo_limite,
             cliente.score,
@@ -131,7 +139,7 @@ def analisar_aumento(
         log.info(
             "Aumento rejeitado para o CPF %s: %.2f solicitado, teto %.2f "
             "(score %d).",
-            cliente.cpf,
+            mascarar_cpf(cliente.cpf),
             novo_limite,
             teto,
             cliente.score,

@@ -12,8 +12,8 @@ from pathlib import Path
 
 from .. import config
 from ..logging_config import obter_logger
-from ..utils import agora_iso, normalizar_cpf
-from .csv_base import anexar_csv, escrever_csv, ler_csv, obter_lock
+from ..utils import agora_iso, mascarar_cpf, normalizar_cpf
+from .csv_base import anexar_csv, escrever_csv, ler_csv, trava_arquivo
 
 log = obter_logger("repositorio.solicitacoes")
 
@@ -65,7 +65,7 @@ def registrar(
     anexar_csv(caminho, COLUNAS, solicitacao.para_linha())
     log.info(
         "Solicitacao registrada: CPF %s, %.2f -> %.2f, status '%s'.",
-        solicitacao.cpf_cliente,
+        mascarar_cpf(solicitacao.cpf_cliente),
         solicitacao.limite_atual,
         solicitacao.novo_limite_solicitado,
         solicitacao.status_pedido,
@@ -92,7 +92,7 @@ def atualizar_status(
     caminho = caminho or config.ARQUIVO_SOLICITACOES
     alvo = normalizar_cpf(cpf)
 
-    with obter_lock(caminho):
+    with trava_arquivo(caminho):
         linhas = ler_csv(caminho)
         atualizado = False
         for linha in reversed(linhas):
@@ -109,14 +109,14 @@ def atualizar_status(
             escrever_csv(caminho, COLUNAS, linhas)
             log.info(
                 "Solicitacao de %s em %s atualizada para '%s'.",
-                alvo,
+                mascarar_cpf(alvo),
                 data_hora,
                 novo_status,
             )
         else:
             log.warning(
                 "Solicitacao de %s em %s nao encontrada para atualizacao.",
-                alvo,
+                mascarar_cpf(alvo),
                 data_hora,
             )
 
@@ -148,6 +148,9 @@ def listar_por_cpf(cpf: str, caminho: Path | None = None) -> list[Solicitacao]:
                 )
             )
         except ValueError:
-            log.warning("Solicitacao com valores invalidos ignorada (CPF %s).", alvo)
+            log.warning(
+                "Solicitacao com valores invalidos ignorada (CPF %s).",
+                mascarar_cpf(alvo),
+            )
 
     return solicitacoes

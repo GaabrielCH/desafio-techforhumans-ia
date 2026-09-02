@@ -28,7 +28,7 @@ ARQUIVO_SOLICITACOES = DIR_DADOS / "solicitacoes_aumento_limite.csv"
 # Modelo (LLM)
 # --------------------------------------------------------------------------- #
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-MODELO = os.getenv("BANCO_AGIL_MODELO", "gemini-3.6-flash")
+MODELO = os.getenv("BANCO_AGIL_MODELO", "gemini-3.1-flash-lite")
 
 # Deixada em branco por padrao: os modelos Gemini 3.x usam amostragem fixa e
 # emitem aviso quando `temperature` e enviada. Preencha apenas se estiver

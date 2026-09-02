@@ -266,13 +266,13 @@ específico e o agente refaz **apenas aquela pergunta**.
 |---|---|
 | **LangGraph** | O desafio é uma máquina de estados com handoffs. LangGraph modela isso diretamente (estado tipado + arestas condicionais + checkpointer), enquanto um framework de "crew" imporia uma hierarquia que aqui só atrapalharia. |
 | **Agentes irmãos, sem supervisor** | Um supervisor acrescentaria uma chamada de LLM por turno só para rotear. Como o `agente_atual` já está no estado, o roteamento é uma função Python determinística — mais barato e mais previsível. |
-| **Google Gemini (`gemini-3.6-flash`)** | Free tier generoso e boa aderência a *tool calling*. O modelo é configurável por `.env`. |
+| **Google Gemini (`gemini-3.1-flash-lite`)** | O modelo mais barato da família que ainda dá conta do *tool calling* deste fluxo — verificado ponta a ponta contra o `gemini-3.5-flash`, com resultado idêntico nos quatro roteiros. Um turno pode custar 2–3 chamadas (agente → ferramenta → agente), então o modelo barato importa. Configurável por `BANCO_AGIL_MODELO` no `.env`. |
 | **Ferramentas por agente** | Escopo garantido no código. Mesmo que o prompt falhe, o Agente de Câmbio não tem como alterar um limite de crédito. |
 | **Cálculo de score fora do LLM** | Score é dinheiro. A fórmula vive em `services/score.py`, é determinística e auditável; o LLM só coleta as respostas. |
 | **AwesomeAPI para cotação** | Não exige chave de API — o avaliador roda o projeto sem cadastrar mais uma credencial — e devolve o par já convertido, sem precisar de LLM para interpretar resultado de busca. |
 | **CSV com escrita atômica + lock** | O desafio manda usar CSV. Escrita atômica evita corromper a base; o lock evita perda de atualização entre threads do Streamlit. |
 | **Exceções de domínio** | `ErroBaseDados`, `ErroServicoExterno`, `ErroEntradaInvalida` permitem que a camada de ferramentas traduza cada falha em uma mensagem adequada, em vez de um `except Exception` genérico. |
-| **Testes com LLM dublê** | 143 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Testes com LLM dublê** | 148 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
 
 ### O que ficou deliberadamente de fora
 
@@ -317,8 +317,14 @@ Edite o `.env` e preencha:
 
 ```env
 GOOGLE_API_KEY=sua_chave_aqui
-BANCO_AGIL_MODELO=gemini-3.6-flash
+BANCO_AGIL_MODELO=gemini-3.1-flash-lite
 ```
+
+> **Sobre o modelo:** o padrão é o `gemini-3.1-flash-lite`, o mais econômico
+> que sustenta o *tool calling* deste fluxo. Modelos mais capazes (e mais
+> caros) funcionam sem nenhuma alteração de código — basta trocar a variável.
+> Note que o free tier limita as requisições por minuto **por modelo**, e um
+> único turno do cliente pode custar de 2 a 3 chamadas.
 
 > O `.env` está no `.gitignore` — a chave nunca vai para o repositório.
 
@@ -342,7 +348,7 @@ python main.py --debug    # mostra o agente ativo a cada turno
 ### 5. Rodar os testes
 
 ```bash
-pytest              # 143 testes, sem necessidade de chave de API
+pytest              # 148 testes, sem necessidade de chave de API
 pytest -v
 pytest --cov=src/banco_agil    # requer pytest-cov
 ```
@@ -458,7 +464,7 @@ desafio-techforhumans-ia/
 │   ├── tools/      # ferramentas por agente
 │   ├── services/   # regra de negócio
 │   └── repositories/  # acesso a CSV
-└── tests/          # 143 testes
+└── tests/          # 148 testes
 ```
 
 ---

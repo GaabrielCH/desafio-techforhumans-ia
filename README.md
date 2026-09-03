@@ -1,5 +1,7 @@
 # 🏦 Banco Ágil — Agente Bancário Inteligente
 
+[![testes](https://github.com/GaabrielCH/desafio-techforhumans-ia/actions/workflows/testes.yml/badge.svg)](https://github.com/GaabrielCH/desafio-techforhumans-ia/actions/workflows/testes.yml)
+
 Sistema de atendimento ao cliente de um banco digital fictício, conduzido por
 agentes de IA especializados que se revezam **sem que o cliente perceba a
 transição**. Construído com **LangGraph + Google Gemini**, com interface de
@@ -71,6 +73,13 @@ compartilhado. Quando uma ferramenta de handoff troca `agente_atual`, o
 próximo nó já enxerga toda a conversa anterior e simplesmente continua
 falando. Não há reapresentação, não há "vou te transferir".
 
+> **O diagrama acima é desenhado à mão para leitura.** A topologia real,
+> extraída do grafo compilado, está em
+> [`docs/arquitetura.mmd`](docs/arquitetura.mmd) e é gerada por
+> `python scripts/gerar_diagrama.py`. Um teste compara as duas e falha se
+> o arquivo ficar para trás — diagrama de arquitetura desatualizado engana
+> mais do que ajuda.
+
 ### Estado compartilhado
 
 ```python
@@ -119,6 +128,7 @@ que a fórmula de score e a política de crédito são testáveis sem chave de A
 | `data/clientes.csv` | Autenticação, limite e score | Reescrita atômica ao atualizar score/limite |
 | `data/score_limite.csv` | Política: faixa de score → teto de crédito | Somente leitura |
 | `data/solicitacoes_aumento_limite.csv` | Pedidos formais de aumento | Append + atualização de status |
+| `data/seed/clientes.csv` | Cópia intocada, para restaurar a demonstração | Nunca escrita em execução |
 
 **Escrita atômica:** a base de clientes é reescrita inteira quando o score
 muda. Gravar direto no arquivo final significaria perder tudo se o processo
@@ -208,6 +218,24 @@ falhe, fica o rastro de que o cliente pediu.
 - [x] Lista de clientes de teste no painel só aparece em modo demonstração
       (`BANCO_AGIL_MODO_DEMO`)
 - [x] Segredos fora do versionamento (`.env` no `.gitignore`)
+
+---
+
+## ✨ Além do pedido
+
+Itens que o enunciado não exige, incluídos porque resolvem um problema real
+do projeto — nenhum deles é enfeite.
+
+| Extra | Por que existe |
+|---|---|
+| **Integração contínua em Linux** ([workflow](.github/workflows/testes.yml)) | A trava de arquivo tem dois caminhos: `msvcrt` no Windows e `fcntl` no POSIX. O desenvolvimento foi no Windows, então metade do código de concorrência nunca rodava. A CI exercita o outro ramo, em Python 3.10 e 3.12, e ainda falha o build se algum arquivo de segredo for versionado. |
+| **Diagrama gerado do grafo compilado** ([docs/arquitetura.mmd](docs/arquitetura.mmd)) | Diagrama desenhado à mão envelhece em silêncio. Este é extraído do próprio LangGraph, e um teste falha se o arquivo versionado divergir da topologia real. |
+| **Suíte end-to-end contra o modelo real** ([tests/test_e2e_real.py](tests/test_e2e_real.py)) | Dublê prova a mecânica, mas não pega o agente esquecendo o que o cliente pediu — que foi exatamente o defeito descrito em *Desafios #9*. |
+| **Testes de concorrência com processos reais** ([tests/test_concorrencia.py](tests/test_concorrencia.py)) | Perda de escrita entre processos é silenciosa: nada falha, linhas somem. Só um teste com subprocessos de verdade pega isso. |
+| **Testes de injeção de prompt** ([tests/test_seguranca.py](tests/test_seguranca.py)) | Um agente bancário que pode ser convencido a pular a autenticação por texto é um problema de segurança, não de qualidade de resposta. |
+| **Restaurar dados de demonstração** | A base da versão publicada é compartilhada entre visitantes. Sem o botão, os roteiros deste README passariam a falhar para o segundo avaliador. |
+| **Baixar a conversa** | Transcrição em `.txt` para anexar como evidência de teste. |
+| **CPF mascarado nos logs** | Log de aplicação não é lugar de dado pessoal completo. |
 
 ---
 
@@ -359,7 +387,7 @@ específico e o agente refaz **apenas aquela pergunta**.
 | **AwesomeAPI para cotação** | Não exige chave de API — o avaliador roda o projeto sem cadastrar mais uma credencial — e devolve o par já convertido, sem precisar de LLM para interpretar resultado de busca. |
 | **CSV com escrita atômica + lock** | O desafio manda usar CSV. Escrita atômica evita corromper a base; o lock evita perda de atualização entre threads do Streamlit. |
 | **Exceções de domínio** | `ErroBaseDados`, `ErroServicoExterno`, `ErroEntradaInvalida` permitem que a camada de ferramentas traduza cada falha em uma mensagem adequada, em vez de um `except Exception` genérico. |
-| **Testes com LLM dublê** | 204 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Testes com LLM dublê** | 218 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
 | **Suíte end-to-end separada** | Dublê prova a mecânica, mas não pega o agente esquecendo o que o cliente pediu. 15 conversas reais cobrem esse tipo de defeito, fora da rodada padrão para que `pytest` continue rodando offline. |
 
 ### O que ficou deliberadamente de fora
@@ -436,6 +464,12 @@ acontece por baixo:
   arquitetura funcionando
 - **Clientes para teste** — CPFs e datas para conseguir se autenticar
 - **Solicitações registradas** — o CSV ao vivo, a cada pedido
+- **Baixar a conversa** — transcrição em `.txt`, para anexar como evidência
+- **Restaurar dados de demonstração** — devolve limites, scores e
+  solicitações ao estado inicial. Existe porque na versão publicada a base é
+  compartilhada: sem isso, quem seguisse os roteiros depois de outro
+  visitante encontraria limites já alterados e concluiria que o sistema
+  errou
 
 > O painel de clientes existe só em modo demonstração
 > (`BANCO_AGIL_MODO_DEMO=true`, padrão). Ele expõe a base inteira, então em
@@ -491,7 +525,7 @@ python main.py --debug    # mostra o agente ativo a cada turno
 ### 6. Rodar os testes
 
 ```bash
-pytest              # 204 testes, sem chave de API e sem rede
+pytest              # 218 testes, sem chave de API e sem rede
 pytest -v
 pytest --cov=src/banco_agil    # requer pytest-cov
 ```
@@ -539,6 +573,10 @@ Política de crédito (`data/score_limite.csv`):
 | 500–699 | R$ 8.000,00 |
 | 700–849 | R$ 15.000,00 |
 | 850–1000 | R$ 30.000,00 |
+
+> Os roteiros abaixo pressupõem a base no estado inicial. Se estiver testando
+> a versão publicada, clique em **Restaurar dados de demonstração** no painel
+> antes de começar — outro visitante pode ter alterado limites e scores.
 
 ### Roteiro A — aumento aprovado
 

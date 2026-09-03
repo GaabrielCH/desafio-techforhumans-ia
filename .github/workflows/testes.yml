@@ -1,0 +1,50 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  testes:
+    # Linux de proposito: a trava de arquivo tem dois caminhos (msvcrt no
+    # Windows, fcntl no POSIX) e o desenvolvimento aconteceu no Windows.
+    # A CI e o que exercita o outro ramo.
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyflakes
+
+      - name: Lint
+        run: python -m pyflakes src/banco_agil app.py main.py tests
+
+      - name: Testes
+        # Sem chave e sem rede: a suite e2e fica de fora por marcador.
+        run: python -m pytest -q
+
+      - name: Conferir que nenhum segredo foi versionado
+        run: |
+          if git ls-files | grep -E '^\.env$|secrets\.toml$'; then
+            echo "::error::arquivo de segredo versionado"
+            exit 1
+          fi
+          echo "nenhum segredo versionado"

@@ -26,7 +26,11 @@ from banco_agil.erros import ErroBancoAgil  # noqa: E402
 from banco_agil.graph import SessaoAtendimento  # noqa: E402
 from banco_agil.repositories import clientes as repo_clientes  # noqa: E402
 from banco_agil.repositories.csv_base import ler_csv  # noqa: E402
-from banco_agil.utils import formatar_data_br, formatar_moeda  # noqa: E402
+from banco_agil.services import demo as servico_demo  # noqa: E402
+from banco_agil.utils import agora_iso, formatar_data_br, formatar_moeda  # noqa: E402
+
+# Se a base viva sumiu, recria a partir da semente antes de qualquer leitura.
+servico_demo.garantir_base()
 
 st.set_page_config(
     page_title="Banco Ágil",
@@ -134,6 +138,54 @@ def _solicitacoes_gravadas() -> None:
         st.caption(f"{len(linhas)} pedido(s) no arquivo.")
 
 
+def _transcricao() -> str:
+    """A conversa em texto, para quem avalia anexar como evidência."""
+    linhas = [
+        "Atendimento Banco Ágil",
+        f"Gerado em {agora_iso()}",
+        "-" * 60,
+        "",
+    ]
+    for mensagem in st.session_state.get("historico", []):
+        quem = "Ágil" if mensagem["papel"] == "agente" else "Cliente"
+        linhas.append(f"{quem}: {mensagem['texto']}")
+        linhas.append("")
+    return "\n".join(linhas)
+
+
+def _baixar_transcricao() -> None:
+    if not st.session_state.get("historico"):
+        return
+    st.download_button(
+        "Baixar a conversa",
+        data=_transcricao(),
+        file_name="atendimento-banco-agil.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+
+
+def _restaurar_demonstracao() -> None:
+    """Devolve a base ao estado inicial.
+
+    Existe porque na versao publicada os dados sao compartilhados: sem isto,
+    quem seguisse os roteiros do README depois de outro visitante encontraria
+    limites ja alterados e acharia que o sistema esta errado.
+    """
+    if not config.MODO_DEMO or not servico_demo.semente_disponivel():
+        return
+
+    if st.button("Restaurar dados de demonstração", use_container_width=True):
+        try:
+            servico_demo.restaurar_dados_demo()
+        except ErroBancoAgil as exc:
+            st.error(str(exc))
+            return
+        reiniciar_sessao()
+        st.session_state.aviso_restauracao = True
+        st.rerun()
+
+
 def desenhar_retaguarda(sessao: SessaoAtendimento | None) -> None:
     estado = sessao.estado if sessao else {}
 
@@ -156,6 +208,9 @@ def desenhar_retaguarda(sessao: SessaoAtendimento | None) -> None:
             reiniciar_sessao()
             st.rerun()
 
+        _baixar_transcricao()
+        _restaurar_demonstracao()
+
 
 # --------------------------------------------------------------------------- #
 # Pagina
@@ -174,6 +229,10 @@ if erro := st.session_state.get("erro_inicializacao"):
         "conversa**."
     )
     st.stop()
+
+if st.session_state.pop("aviso_restauracao", False):
+    st.success("Dados de demonstração restaurados. Limites, scores e "
+               "solicitações voltaram ao estado inicial.")
 
 for mensagem in st.session_state.get("historico", []):
     ui.fala(mensagem["papel"], mensagem["texto"])

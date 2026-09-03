@@ -1,0 +1,32 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	triagem(triagem)
+	credito(credito)
+	entrevista(entrevista)
+	cambio(cambio)
+	ferramentas(ferramentas)
+	__end__([<p>__end__</p>]):::last
+	__start__ -.-> cambio;
+	__start__ -.-> credito;
+	__start__ -.-> entrevista;
+	__start__ -.-> triagem;
+	cambio -.-> __end__;
+	cambio -.-> ferramentas;
+	credito -.-> __end__;
+	credito -.-> ferramentas;
+	entrevista -.-> __end__;
+	entrevista -.-> ferramentas;
+	ferramentas -.-> cambio;
+	ferramentas -.-> credito;
+	ferramentas -.-> entrevista;
+	ferramentas -.-> triagem;
+	triagem -.-> __end__;
+	triagem -.-> ferramentas;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

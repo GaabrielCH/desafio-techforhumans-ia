@@ -43,8 +43,26 @@ ui.aplicar_estilo()
 # --------------------------------------------------------------------------- #
 def reiniciar_sessao() -> None:
     """Descarta a conversa atual e comeca uma nova."""
-    for chave in ("sessao", "historico", "erro_inicializacao", "ferramentas"):
+    for chave in (
+        "sessao",
+        "historico",
+        "erro_inicializacao",
+        "ferramentas",
+        "percurso",
+    ):
         st.session_state.pop(chave, None)
+
+
+def registrar_percurso(agente: str) -> None:
+    """Acumula as especialidades por onde a conversa passou.
+
+    Repeticoes consecutivas nao entram: o interessante e a troca, e o
+    cliente pode voltar para uma especialidade ja visitada (credito ->
+    entrevista -> credito), o que e informacao legitima do percurso.
+    """
+    trilha = st.session_state.setdefault("percurso", [])
+    if agente and (not trilha or trilha[-1] != agente):
+        trilha.append(agente)
 
 
 def garantir_sessao() -> SessaoAtendimento | None:
@@ -71,6 +89,8 @@ def garantir_sessao() -> SessaoAtendimento | None:
     st.session_state.sessao = sessao
     st.session_state.historico = [{"papel": "agente", "texto": saudacao}]
     st.session_state.ferramentas = []
+    st.session_state.percurso = []
+    registrar_percurso(sessao.estado.get("agente_atual", config.AGENTE_TRIAGEM))
     return sessao
 
 
@@ -120,7 +140,8 @@ def desenhar_retaguarda(sessao: SessaoAtendimento | None) -> None:
     with st.sidebar:
         ui.marca_console()
         ui.ficha_de_sessao(estado)
-        ui.trilho_de_especialidades(estado.get("agente_atual", ""))
+        ui.especialidade_atual(estado.get("agente_atual", ""))
+        ui.percurso(st.session_state.get("percurso") or [])
         ui.registro_do_turno(st.session_state.get("ferramentas") or [])
 
         if estado.get("ultimo_status_solicitacao"):
@@ -174,4 +195,5 @@ if entrada:
 
     st.session_state.historico.append({"papel": "agente", "texto": resposta})
     st.session_state.ferramentas = sessao.ferramentas_do_ultimo_turno()
+    registrar_percurso(sessao.estado.get("agente_atual", ""))
     st.rerun()

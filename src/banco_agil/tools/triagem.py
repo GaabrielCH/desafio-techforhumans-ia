@@ -86,8 +86,14 @@ def autenticar_cliente(
                     ToolMessage(
                         content=(
                             f"Autenticacao aprovada. Cliente: {cliente.nome}. "
-                            "Cumprimente pelo primeiro nome e pergunte, de "
-                            "forma objetiva, como pode ajudar."
+                            "Cumprimente pelo primeiro nome. "
+                            "ATENCAO: se o cliente JA disse nesta conversa o "
+                            "que precisa (limite, aumento, cotacao), atenda "
+                            "esse assunto agora, chamando a ferramenta de "
+                            "direcionamento adequada no mesmo turno. NAO "
+                            "pergunte 'como posso ajudar' nem faca o cliente "
+                            "repetir o que ja pediu. Só pergunte como pode "
+                            "ajudar se o assunto ainda nao tiver aparecido."
                         ),
                         tool_call_id=tool_call_id,
                     )

@@ -155,52 +155,50 @@ html, body, [data-testid="stAppViewContainer"] {{
 }}
 .ag-console span {{
   display: block; font-family: var(--corpo); font-weight: 400;
-  font-size: .74rem; color: rgba(207,224,221,.5); margin-top: .1rem;
+  font-size: .76rem; color: rgba(207,224,221,.62); margin-top: .12rem;
 }}
 
+/* Rotulo de secao. .68 e o piso de contraste aceitavel sobre o petroleo. */
 .ag-rotulo {{
-  font-family: var(--corpo); font-weight: 500; font-size: .74rem;
-  color: rgba(207,224,221,.5); margin: 1.5rem 0 .6rem;
+  font-family: var(--corpo); font-weight: 500; font-size: .76rem;
+  color: rgba(207,224,221,.68); margin: 1.5rem 0 .55rem;
+}}
+.ag-rotulo:first-child {{ margin-top: 0; }}
+
+/* especialidade atual: uma afirmacao, nao uma lista de coisas apagadas */
+.ag-atual {{
+  border-left: 3px solid var(--ouro); border-radius: 0 8px 8px 0;
+  background: rgba(232,163,61,.09);
+  padding: .7rem .85rem;
+}}
+.ag-atual-nome {{
+  font-family: var(--display); font-weight: 600; font-size: 1.12rem;
+  color: var(--ouro); letter-spacing: -.01em; line-height: 1.2;
+}}
+.ag-atual-nota {{
+  font-family: var(--corpo); font-size: .78rem;
+  color: rgba(207,224,221,.65); margin-top: .15rem;
 }}
 
-/* trilho de especialidades: a assinatura */
-.ag-trilho {{ list-style: none; margin: 0; padding: 0; }}
-.ag-parada {{
-  position: relative; padding: 0 0 .85rem 1.5rem;
-  font-family: var(--corpo); font-size: .92rem; font-weight: 400;
-  color: rgba(207,224,221,.45);
+/* percurso: a historia real do roteamento, so quando ela existe */
+.ag-percurso {{
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .1rem;
+  font-family: var(--corpo); font-size: .82rem;
 }}
-.ag-parada::before {{           /* a parada */
-  content: ""; position: absolute; left: 0; top: .38rem;
-  width: 8px; height: 8px; border-radius: 50%;
-  border: 1.5px solid rgba(207,224,221,.3); background: var(--tinta);
-  transition: background .2s ease, box-shadow .2s ease;
-}}
-.ag-parada::after {{            /* o trilho que liga */
-  content: ""; position: absolute; left: 3.5px; top: 1.15rem;
-  width: 1.5px; height: calc(100% - 1rem);
-  background: rgba(207,224,221,.14);
-}}
-.ag-parada:last-child {{ padding-bottom: 0; }}
-.ag-parada:last-child::after {{ display: none; }}
-.ag-parada[data-ativa="1"] {{ color: var(--ouro); font-weight: 600; }}
-.ag-parada[data-ativa="1"]::before {{
-  background: var(--ouro); border-color: var(--ouro);
-  box-shadow: 0 0 0 3.5px rgba(232,163,61,.16);
+.ag-passo {{ color: rgba(207,224,221,.62); white-space: nowrap; }}
+.ag-passo:last-child {{ color: var(--ouro); font-weight: 600; }}
+.ag-seta {{
+  color: rgba(207,224,221,.3); padding: 0 .34rem; font-size: .78rem;
 }}
 
 /* registro de ferramentas do turno */
 .ag-registro {{ margin: 0; padding: 0; list-style: none; }}
 .ag-registro li {{
-  font-family: var(--corpo); font-size: .82rem; line-height: 1.45;
-  color: rgba(207,224,221,.82);
-  padding: .4rem .6rem .4rem .7rem; border-left: 2px solid var(--ouro);
-  margin-bottom: .3rem; background: rgba(232,163,61,.06);
+  font-family: var(--corpo); font-size: .84rem; line-height: 1.45;
+  color: rgba(207,224,221,.88);
+  padding: .42rem .6rem .42rem .7rem; border-left: 2px solid var(--ouro);
+  margin-bottom: .3rem; background: rgba(232,163,61,.07);
   border-radius: 0 6px 6px 0;
-}}
-.ag-vazio {{
-  font-family: var(--corpo); font-size: .8rem;
-  color: rgba(207,224,221,.35);
 }}
 
 /* ficha de sessao */
@@ -219,8 +217,8 @@ html, body, [data-testid="stAppViewContainer"] {{
   color: #EAF3F1; letter-spacing: -.01em;
 }}
 .ag-ficha-nota {{
-  font-family: var(--corpo); font-size: .78rem;
-  color: rgba(207,224,221,.6); margin-top: .18rem;
+  font-family: var(--corpo); font-size: .79rem;
+  color: rgba(207,224,221,.7); margin-top: .18rem;
 }}
 
 /* medidor de tentativas */
@@ -266,6 +264,34 @@ html, body, [data-testid="stAppViewContainer"] {{
   color: var(--ouro);
 }}
 
+/* avisos do Streamlit: o azul e o vermelho padrao brigam com a paleta */
+[data-testid="stAlert"] {{
+  border-radius: 10px; border: 1px solid rgba(8,48,47,.14);
+  background: var(--cartao); color: #10312F;
+  font-family: var(--corpo); font-size: .88rem;
+}}
+[data-testid="stAlert"] * {{ color: #10312F; }}
+[data-testid="stAlertContentInfo"] {{ border-left: 3px solid var(--tinta); }}
+[data-testid="stAlertContentError"] {{ border-left: 3px solid var(--rubro); }}
+[data-testid="stAlert"] svg {{ display: none; }}
+
+/* tabela do CSV dentro do painel escuro: vira um cartao claro proposital */
+[data-testid="stSidebar"] [data-testid="stDataFrame"] {{
+  border-radius: 8px; overflow: hidden;
+}}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] p,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
+  font-size: .82rem; color: rgba(207,224,221,.75);
+}}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] code {{
+  font-family: var(--mono); font-size: .78rem;
+  background: rgba(255,255,255,.07); color: #DCEAE7;
+  padding: .05rem .3rem; border-radius: 4px;
+}}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] strong {{
+  color: #EAF3F1;
+}}
+
 /* acessibilidade */
 :focus-visible {{ outline: 2px solid var(--ouro); outline-offset: 2px; }}
 @media (prefers-reduced-motion: reduce) {{
@@ -288,12 +314,12 @@ _MARCA_SVG = f"""
 </svg>
 """
 
-ORDEM_ESPECIALIDADES = (
-    (config.AGENTE_TRIAGEM, "Triagem"),
-    (config.AGENTE_CREDITO, "Crédito"),
-    (config.AGENTE_ENTREVISTA, "Entrevista"),
-    (config.AGENTE_CAMBIO, "Câmbio"),
-)
+NOMES_ESPECIALIDADE = {
+    config.AGENTE_TRIAGEM: "Triagem",
+    config.AGENTE_CREDITO: "Crédito",
+    config.AGENTE_ENTREVISTA: "Entrevista de crédito",
+    config.AGENTE_CAMBIO: "Câmbio",
+}
 
 ROTULOS_FERRAMENTA = {
     "autenticar_cliente": "autenticou o cliente",
@@ -397,35 +423,65 @@ def ficha_de_sessao(estado: dict) -> None:
     )
 
 
-def trilho_de_especialidades(agente_atual: str) -> None:
-    """A assinatura: as quatro paradas, com a ativa acesa."""
-    st.markdown('<div class="ag-rotulo">Especialidade ativa</div>',
-                unsafe_allow_html=True)
-    paradas = "".join(
-        f'<li class="ag-parada" data-ativa="{int(chave == agente_atual)}">'
-        f"{rotulo}</li>"
-        for chave, rotulo in ORDEM_ESPECIALIDADES
+def especialidade_atual(agente: str) -> None:
+    """Quem esta conduzindo a conversa agora.
+
+    Uma afirmacao unica em vez de uma lista de quatro itens com tres
+    apagados: mostrar o que NAO esta acontecendo consome espaco sem
+    informar nada.
+    """
+    nome = NOMES_ESPECIALIDADE.get(agente, "Triagem")
+    st.markdown(
+        f'<div class="ag-rotulo">Conduzindo agora</div>'
+        f'<div class="ag-atual">'
+        f'<div class="ag-atual-nome">{html.escape(nome)}</div>'
+        f'<div class="ag-atual-nota">o cliente não percebe a troca</div>'
+        f"</div>",
+        unsafe_allow_html=True,
     )
-    st.markdown(f'<ul class="ag-trilho">{paradas}</ul>', unsafe_allow_html=True)
+
+
+def percurso(visitados: list[str]) -> None:
+    """A sequencia real de especialidades que a conversa atravessou.
+
+    So aparece depois do primeiro handoff: antes disso nao ha percurso
+    nenhum a contar, e um item solitario seria apenas repeticao.
+    """
+    if len(visitados) < 2:
+        return
+
+    partes: list[str] = []
+    for indice, agente in enumerate(visitados):
+        if indice:
+            partes.append('<span class="ag-seta">→</span>')
+        nome = NOMES_ESPECIALIDADE.get(agente, agente)
+        partes.append(f'<span class="ag-passo">{html.escape(nome)}</span>')
+
+    st.markdown(
+        f'<div class="ag-rotulo">Percurso da conversa</div>'
+        f'<div class="ag-percurso">{"".join(partes)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def registro_do_turno(ferramentas: list[str]) -> None:
-    """O que o sistema fez desde a ultima mensagem do cliente."""
-    st.markdown('<div class="ag-rotulo">No último turno</div>',
-                unsafe_allow_html=True)
+    """O que o sistema fez desde a ultima mensagem do cliente.
 
+    Some quando nao ha nada a mostrar - um bloco dizendo "nada aconteceu"
+    ocupa espaco para nao informar.
+    """
     if not ferramentas:
-        st.markdown(
-            '<div class="ag-vazio">nenhuma ferramenta acionada</div>',
-            unsafe_allow_html=True,
-        )
         return
 
     itens = "".join(
         f"<li>{html.escape(ROTULOS_FERRAMENTA.get(nome, nome))}</li>"
         for nome in ferramentas
     )
-    st.markdown(f'<ul class="ag-registro">{itens}</ul>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="ag-rotulo">No último turno</div>'
+        f'<ul class="ag-registro">{itens}</ul>',
+        unsafe_allow_html=True,
+    )
 
 
 def desfecho_do_pedido(status: str) -> None:

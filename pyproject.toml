@@ -31,4 +31,7 @@ pythonpath = ["src"]
 filterwarnings = ["ignore::DeprecationWarning"]
 markers = [
     "slow: testes que sobem subprocessos ou dependem de tempo real",
+    "e2e: conversa com o modelo real (exige chave e consome cota)",
 ]
+# O e2e real fica fora da rodada padrao: `pytest` tem de passar offline.
+addopts = "-m 'not e2e'"

@@ -303,7 +303,29 @@ receberia a cotação da moeda errada — um erro silencioso e caro.
 **Solução:** ordenar os apelidos do mais longo para o mais curto antes de
 casar. Seis casos de frase cobrem a regressão.
 
-### 9. Entrada humana não é um formulário
+### 9. O atendente esquecia o que o cliente já tinha pedido
+
+**Problema:** encontrado pela suíte end-to-end contra o modelo real. O
+cliente abria com "quero saber meu limite", o agente respondia "para isso
+preciso confirmar sua identidade", coletava CPF e data — e depois de
+autenticar perguntava **"como posso ajudar?"**, obrigando o cliente a
+repetir o que já tinha dito na primeira mensagem.
+
+**Causa:** não era o modelo desobedecendo o prompt. O `ToolMessage` de
+sucesso da autenticação instruía literalmente *"cumprimente e pergunte como
+pode ajudar"*. Como o retorno da ferramenta é a última coisa que o modelo lê
+antes de responder, ele vencia a regra que estava no prompt de sistema.
+
+**Solução:** a instrução de continuidade passou para o próprio retorno da
+ferramenta — o ponto de maior alavancagem — e virou passo explícito do fluxo
+de triagem em vez de nota no rodapé. Depois da correção, o agente responde
+`"Olá, Ana Beatriz! No momento, seu limite de crédito é de R$ 5.000,00 e seu
+score atual é 720."` já no turno da autenticação.
+
+**Lição:** o que a ferramenta devolve *é* prompt. Instrução contraditória ali
+sobrepõe silenciosamente o prompt de sistema.
+
+### 10. Entrada humana não é um formulário
 
 **Problema:** o cliente escreve "R$ 5.000,00", "14/05/1990", "carteira
 assinada", "não tenho nenhum".
@@ -327,7 +349,8 @@ específico e o agente refaz **apenas aquela pergunta**.
 | **AwesomeAPI para cotação** | Não exige chave de API — o avaliador roda o projeto sem cadastrar mais uma credencial — e devolve o par já convertido, sem precisar de LLM para interpretar resultado de busca. |
 | **CSV com escrita atômica + lock** | O desafio manda usar CSV. Escrita atômica evita corromper a base; o lock evita perda de atualização entre threads do Streamlit. |
 | **Exceções de domínio** | `ErroBaseDados`, `ErroServicoExterno`, `ErroEntradaInvalida` permitem que a camada de ferramentas traduza cada falha em uma mensagem adequada, em vez de um `except Exception` genérico. |
-| **Testes com LLM dublê** | 202 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Testes com LLM dublê** | 204 testes rodam **sem chave de API e sem rede**. O que se testa não é o texto do modelo, e sim o que precisa valer sempre: bloqueio antes da autenticação, limite de 3 tentativas, handoff, terminação do loop. |
+| **Suíte end-to-end separada** | Dublê prova a mecânica, mas não pega o agente esquecendo o que o cliente pediu. 15 conversas reais cobrem esse tipo de defeito, fora da rodada padrão para que `pytest` continue rodando offline. |
 
 ### O que ficou deliberadamente de fora
 
@@ -454,10 +477,27 @@ python main.py --debug    # mostra o agente ativo a cada turno
 ### 6. Rodar os testes
 
 ```bash
-pytest              # 202 testes, sem necessidade de chave de API
+pytest              # 204 testes, sem chave de API e sem rede
 pytest -v
 pytest --cov=src/banco_agil    # requer pytest-cov
 ```
+
+**Validação end-to-end contra o modelo real** (exige chave e consome cota):
+
+```bash
+BANCO_AGIL_E2E=1 pytest tests/test_e2e_real.py -m e2e -v
+# Windows PowerShell:
+$env:BANCO_AGIL_E2E="1"; pytest tests/test_e2e_real.py -m e2e -v
+```
+
+São 15 conversas completas, do jeito que um cliente conversaria: texto
+bagunçado, mudança de assunto no meio, tentativa de burlar a autenticação,
+desistência da entrevista. As asserções são sempre sobre o que é
+determinístico — estado da sessão, conteúdo dos CSVs e ausência de termos
+proibidos — porque o fraseado do modelo muda a cada execução. Leva cerca de
+10 minutos por causa do limite de requisições do free tier.
+
+Foi essa suíte que encontrou o defeito descrito em *Desafios #9*.
 
 ---
 

@@ -25,6 +25,18 @@ AppTest = pytest.importorskip(
     "streamlit.testing.v1", reason="Streamlit sem framework de teste"
 ).AppTest
 
+_STREAMLIT_REAL = ui.st
+
+
+class _StreamlitFalso:
+    """Captura o markdown de um componente fora do runtime do Streamlit."""
+
+    def __init__(self, destino: list[str]) -> None:
+        self._destino = destino
+
+    def markdown(self, corpo: str, **_kwargs) -> None:
+        self._destino.append(corpo)
+
 
 @pytest.fixture()
 def app_com_llm_falso(monkeypatch, bases):
@@ -56,27 +68,39 @@ def test_saudacao_inicial_aparece(app_com_llm_falso):
     assert "CPF" in _pagina(app_com_llm_falso)
 
 
-def test_marca_e_trilho_sao_renderizados(app_com_llm_falso):
+def test_marca_e_especialidade_sao_renderizadas(app_com_llm_falso):
     pagina = _pagina(app_com_llm_falso)
     assert "Banco Ágil" in pagina
-    assert "ag-trilho" in pagina, "o trilho de especialidades nao apareceu"
+    assert "ag-atual-nome" in pagina, "a especialidade atual nao apareceu"
     assert "Triagem" in pagina
 
 
-def test_trilho_marca_a_especialidade_ativa(app_com_llm_falso):
-    """A conversa comeca na triagem: ela precisa ser a unica acesa."""
-    import re
+def test_percurso_so_aparece_depois_do_primeiro_handoff(app_com_llm_falso):
+    """Um percurso de um item so seria repeticao da especialidade atual."""
+    # Procurar a classe solta acharia tambem o seletor dentro do <style>.
+    assert '<div class="ag-percurso">' not in _pagina(app_com_llm_falso)
 
-    pagina = _pagina(app_com_llm_falso)
-    # Contar na pagina inteira pegaria tambem os seletores do CSS.
-    trilho = re.search(r'<ul class="ag-trilho">.*?</ul>', pagina, re.S)
-    assert trilho, "o trilho nao foi renderizado"
 
-    marcacao = trilho.group(0)
-    assert marcacao.count('data-ativa="1"') == 1
-    assert marcacao.count('data-ativa="0"') == 3
-    # E a parada acesa e a Triagem.
-    assert re.search(r'data-ativa="1">\s*Triagem', marcacao)
+def test_percurso_mostra_a_sequencia_de_especialidades():
+    """Com mais de uma parada, o percurso conta a historia do roteamento."""
+    from banco_agil import config
+
+    marcacao: list[str] = []
+    ui.st = _StreamlitFalso(marcacao)  # type: ignore[assignment]
+    try:
+        ui.percurso([config.AGENTE_TRIAGEM, config.AGENTE_CREDITO])
+    finally:
+        ui.st = _STREAMLIT_REAL  # type: ignore[assignment]
+
+    saida = " ".join(marcacao)
+    assert '<div class="ag-percurso">' in saida
+    assert "Triagem" in saida and "Crédito" in saida
+    assert "→" in saida
+
+
+def test_registro_do_turno_some_quando_nao_ha_nada(app_com_llm_falso):
+    """Um bloco dizendo 'nada aconteceu' ocupa espaco sem informar."""
+    assert "No último turno" not in _pagina(app_com_llm_falso)
 
 
 def test_conversa_avanca_ao_enviar_mensagem(app_com_llm_falso):

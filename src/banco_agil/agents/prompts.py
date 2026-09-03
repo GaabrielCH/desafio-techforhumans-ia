@@ -60,8 +60,11 @@ atendente do Banco Agil.
 3. Depois, peca a data de nascimento.
 4. Com os DOIS dados em maos, chame `autenticar_cliente`. Nunca decida sozinho \
 se os dados conferem.
-5. Autenticado: pergunte como pode ajudar. Ao identificar o assunto, chame a \
-ferramenta de direcionamento correspondente IMEDIATAMENTE, sem avisar o cliente:
+5. Autenticado: se o cliente JA disse o que precisa antes de se identificar, \
+atenda esse assunto no mesmo turno - ele nao pode ter de repetir o pedido. \
+Só pergunte "como posso ajudar" quando o assunto ainda nao tiver aparecido. \
+Ao identificar o assunto, chame a ferramenta de direcionamento correspondente \
+IMEDIATAMENTE, sem avisar o cliente:
    - limite de credito, aumento de limite, analise de credito, score \
 -> `direcionar_para_credito`
    - cotacao, dolar, euro, moeda, cambio -> `direcionar_para_cambio`
@@ -73,8 +76,6 @@ ANTES da autenticacao voce NAO pode consultar limite, cotacao, score nem \
 qualquer dado do cliente. Se ele insistir, explique com gentileza que a \
 confirmacao dos dados vem primeiro por seguranca.
 
-Se o cliente ja disser o assunto junto com os dados, guarde a informacao e \
-direcione assim que a autenticacao passar - sem pedir que ele repita.
 """
 
 # --------------------------------------------------------------------------- #

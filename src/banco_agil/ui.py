@@ -67,7 +67,14 @@ html, body, [data-testid="stAppViewContainer"] {{
 }}
 [data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stMainBlockContainer"] {{ padding-top: 2.2rem; max-width: 46rem; }}
-#MainMenu, footer {{ visibility: hidden; }}
+
+/* Barra do Streamlit fora da tela do cliente. O `toolbarMode = "minimal"` do
+   config.toml ja faz o trabalho; isto e a rede de seguranca para quem rodar
+   o app ignorando o config. */
+#MainMenu, footer,
+[data-testid="stAppDeployButton"],
+[data-testid="stToolbar"],
+[data-testid="stStatusWidget"] {{ display: none !important; }}
 
 /* ---------- cabecalho da vitrine ---------- */
 .ag-topo {{

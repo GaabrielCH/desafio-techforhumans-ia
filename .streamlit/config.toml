@@ -13,3 +13,9 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# Esconde a barra do Streamlit (botao "Deploy", menu de desenvolvedor). Quem
+# usa a tela e um cliente do banco, nao alguem publicando o app.
+toolbarMode = "minimal"
+showErrorDetails = "none"

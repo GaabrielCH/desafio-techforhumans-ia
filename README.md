@@ -5,6 +5,16 @@ agentes de IA especializados que se revezam **sem que o cliente perceba a
 transição**. Construído com **LangGraph + Google Gemini**, com interface de
 testes em **Streamlit**.
 
+### ▶ [Testar a aplicação online](https://desafio-techforhumans-ia-gaabrielch.streamlit.app/)
+
+Não precisa instalar nada. Para entrar, use um dos CPFs de teste listados no
+painel lateral — por exemplo `123.456.789-01`, nascimento `14/05/1990`.
+
+> Demonstração com dados fictícios. A base é compartilhada entre os
+> visitantes e reinicia a cada atualização do app; a cota gratuita da Gemini
+> é por minuto, então respostas podem demorar se houver acessos simultâneos.
+> Para avaliar sem essas limitações, rode local: [tutorial](#-tutorial-de-execução-e-testes).
+
 ---
 
 ## 📋 Visão Geral
@@ -432,6 +442,10 @@ acontece por baixo:
 > qualquer uso que não seja demonstração deve ficar desligado.
 
 ### 4. Publicar online (Streamlit Community Cloud)
+
+> Já publicado em
+> **https://desafio-techforhumans-ia-gaabrielch.streamlit.app/**
+> Os passos abaixo ficam registrados para reproduzir o deploy do zero.
 
 > **GitHub Pages não serve para este projeto.** Ele hospeda apenas arquivos
 > estáticos, e aqui há um servidor Python rodando agentes. O caminho é o
